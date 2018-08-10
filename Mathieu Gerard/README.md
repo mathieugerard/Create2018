@@ -17,7 +17,6 @@ The objectives of the workshop are
 The following tools will be required for the workshop. To save time, please ensure your have them installed on your own laptop.
 
 - Node.js - Install from [nodejs.org](https://nodejs.org)
-- Redis - Check instructions from [redis.io](https://redis.io/topics/quickstart)
 - Git - Get started at [git-scm.com/book/en/v2/Getting-Started-Installing-Git](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git)
 - ngrok - Download from [ngrok.com/download](https://ngrok.com/download)
 
@@ -32,7 +31,7 @@ Also, you'll need the following accounts. Don't hesitate to sign-up before the w
 
 The Meraki wifi network is collecting location of the mobile devices being seen. Those locations can be pushed to a listener so you can make use of them.
 
-All the details about the Meraki positioning can be found on [github.com/IndoorLocation/meraki-indoor-location](https://github.com/IndoorLocation/meraki-indoor-location). In this workshop, we will only focus on a little part of it.
+All the details about the Meraki positioning can be found on [github.com/IndoorLocation/meraki-indoor-location](https://github.com/IndoorLocation/meraki-indoor-location).
 
 ### Import the Meraki configuration in Mapwize
 
@@ -44,7 +43,7 @@ In your Mapwize account, create a venue for "DevNet Create 2018" at the Computer
 
 In the venue config screen, on the right side, scroll down to retrieve your venueId and organizationId.
 
-Go back to the home page then in the left venue select "API key" and create an API key.
+Go back to the home page then in the left venue select "API key" and copy your API key.
 
 Download the Meraki floorplan configuration file. Usually you would get this from the Meraki portal but I've made a copy of it as I cannot grant everyone access to the Meraki network of the event. The config file is available in this repository.
 
@@ -62,9 +61,9 @@ Use the configurator to inject the Meraki floorplan config to your Mapwize venue
 
 Go to [Mapwize Studio](https://studio.mapwize.io), enter your venue and go to the Layers section. You'll see that a "Meraki - xx" layer has been created. That's the image that was used in Meraki, positionned precisely like in the Meraki portal.
 
-As Meraki does not support proper configuration of floors in the Meraki Portal, you'll need to manually edit the layer and **set floor=2**. Also, **toggle the publish status to true** and **select the default universe**. And save.
+As Meraki does not support proper configuration of floors in the Meraki Portal, you'll need to manually edit the layer and **set floor=2**. Also, make sure that the **published status is set to true** and **select the default universe**. And save.
 
-Here the event is on a single floor but of course multiple floor buildings would be as easily supported.
+If you would be dealing with a multiple floor building, simply go through those steps for each  floor.
 
 ### Listen for Meraki notifications
 
@@ -74,37 +73,23 @@ Now that the layer is correctly configured in Mapwize, with the right floor and 
 ./meraki-configurator/configureFromMapwize --merakiFloorPlansConfig [FILEPATH_FOR_FLOORPLANS_JSON] --mapwizeUser [YOUR_MAPWIZE_EMAIL] --mapwizePwd [YOUR_MAPWIZE_PWD] --mapwizeApiKey [YOUR_MAPWIZE_API_KEY] --mapwizeOrganizationId [YOUR_MAPWIZE_ORGANIZATIONID] --mapwizeVenueId [YOUR_MAPWIZE_VENUEID] --output [OUTPUT_PATH_FOR_LISTENER_CONFIGURATION]
 ```
 
-Now it's time to start a local Redis database on your machine. The database will allow to store the last position received for each device. 
+Now it's time to start the indoor location Meraki server on your machine. The server is available in the same Meraki IndoorLocation Github repository, in the server directory.
 
-```
-redis-server
-```
-
-We need to activate redis notifications for the system to work by using the following comand:
-
-```
-redis-cli config set notify-keyspace-events K$
-```
-
-The listener is available in the same Meraki IndoorLocation Github repository, in the listener directory.
-
-You can set the configuration of the listener directly in the `config/all.js` file or using environment variables.
-
-Assuming your Redis server is running with default configuration (localhost:6379 without auth), the only variable you'll need are:
+You can set the configuration of the server directly in the `config/all.js` file or using environment variables. The variable you'll need are:
 
   * FLOOR_PLANS: copy paste the content of the JSON file produced by the `configureFromMapwize` command
   * MAC_ADDRESS_ENABLED: true (better for the asset tracking cases)
   * VALIDATOR: "devnetcreate2018"
 
-By default, your listener will be running on `localhost:3004`.
+By default, your server will be running on `localhost:3004`.
 
-And now you can start the listener server with
+Start the server with
 
 ```
-npm run start-listener
+npm run start
 ```
 
-Now your listener server is ready to retrieve notifications.
+Now your server is ready to retrieve notifications.
 
 In normal cases, you would add your listener server as `post URL` in your Meraki "Location and scanning" configuration. However, for this workshop, it is not really handy to manually add the url of each participant. Therefore, we are going to use this little [post-boradcast](https://github.com/mathieugerard/post-broadcast) project that can propagate post requests.
 
@@ -124,30 +109,6 @@ SERVER=[THE BROADCAST SERVER URL] node client.js
 
 Everytime a notification is received by the broadcast server, your broadcast client will make the same post request to your Meraki listener server. If your Meraki listener server is not running on `localhost:3004`, you'll need to use the `POSTTO` environment variable to configure it.
 
-Now you should start receiving notifications and your Redis database will be populated with locations.
-
-You can use [RDM](https://redisdesktop.com/) or your favourite Redis explorer to see the records.
-
-### Setup the emitter server
-
-Now we have locations flowing to our Redis database but so far no one can use it. The next step is to setup the emitter server to allow other systems (apps or other components) to retrieve location updates for specific IP or MAC using websocket.
-
-The emitter server is located in the same Meraki IndoorLocation Github repository, in the emitter directory.
-
-You can set the configuration of the listener directly in the `config/all.js` file or using environment variables.
-
-Assuming your Redis server is running with default configuration (localhost:6379 without auth), you don't need any particular configuration.
-
-Start the server using
-
-```
-npm run start-emitter
-```
-
-By default, your emitter will be running on `localhost:3003`.
-
-So now you have everything you need to retrieve the location of any device using websocket. Cool right :-)
-
 ## 2 - See your location on the map
 
 So now you can see your position on the map ... or even the position of anyone at the conference as long as you know their local IP address or their Mac address. Of course that opens lots of questions regarding privacy but that's not the point right now.
@@ -156,20 +117,14 @@ So now you can see your position on the map ... or even the position of anyone a
 
 The simplest way to see your location is to use maps.mapwize.io as there is nothing to code or compile.
 
-Go back to [Mapwize Studio](https://studio.mapwize.io). From the home screen, on the left menu, go to the "Access groups". Create a group containing all venues and all universes.
-
-Then head to "Access keys" and create a key for the access group you just created.
-
-Go to venues and then select your venue. Make sure that your venue is published by setting the published flag to true and saving it.
-
-Then, inside your venue, head to the URL generator and create an URL to see your venue using the access key you created.
+Go back to [Mapwize Studio](https://studio.mapwize.io) and then select your venue. Then head to the URL generator and create an URL to see your venue using the access key you created.
 
 Open the link in your browser and you should be able to see the map of DevNet Create. But your location is not on it yet.
 
 To do so, you'll need to add the `indoorLocationSocketUrl` and `indoorLocationUserId` parameters to your URL. Since maps.mapwize.io is served using https, using `localhost` as socket url will not work. Therefore you need to use `ngrok`. Ngrok will create a tunnel to your local machine that is available from the cloud. Run
 
 ```
-ngrok http 3003
+ngrok http 3004
 ```
 
 and use the address provided by ngrok. You need to keep ngrok running on your maching for the connection to be maintained.
@@ -177,12 +132,22 @@ and use the address provided by ngrok. You need to keep ngrok running on your ma
 The complete URL to type in your browser should look like this:
 
 ```
-https://maps.mapwize.io/#/v/[VENUE_ALIAS]?k=[ACCESS_KEY]&indoorLocationSocketUrl=localhost:3003& indoorLocationUserId=[YOUR_LOCAL_IP_OR_MAC]
+https://maps.mapwize.io/#/v/[VENUE_ALIAS]?k=[ACCESS_KEY]&indoorLocationSocketUrl=[NGROK_SUBDOMAIN].ngrok.io& indoorLocationUserId=[YOUR_LOCAL_IP_OR_MAC]
 ```
 
 To use your local IP address, you need to be connected to the Meraki Wifi. Ask me for credentials.
 
 Refresh the page and you should see your position as provided by Meraki.
+
+### View your location in the iOS or Android Mapwize app
+
+Go to [Mapwize Studio](https://studio.mapwize.io) and then select your venue. Then head to the "Indoor Location" tab. There enable the Meraki indoor location and copy your socket URL which is your `ngrok` url: [NGROK_SUBDOMAIN].ngrok.io.
+
+Download the Mapwize app on your phone and open it.
+
+Make sure your phone is connected on the Meraki WiFi network.
+
+To have access to your venue, go to [Mapwize Studio](https://studio.mapwize.io) and then to the url generator. Generate an URL to see your venue using the access key, then scan the QR-code with your app. Your venue should appear together with your position.
 
 ### View your location in a simple mobile app
 
@@ -197,8 +162,6 @@ You will need to set your credentials in SocketIndoorLocationProviderDemoApp and
 
 * Set your API key in SocketIndoorLocationProviderDemoApp. (see below)
 * Set the URL of your emitter server in MapActivity on line 48. (see below)
-
-In order to see your venue in the app, you'll need to add the rights on your API key. To do so, go to [Mapwize Studio](https://studio.mapwize.io) and then to "API keys". Edit the API key you already have and add your access group in it.
 
 On mobile, your locap IP address is used automatically to fetch your position. Therefore, **your device must be connected to the Meraki network**. Ask me for credentials.
 
@@ -219,15 +182,6 @@ Go to the layer list, select the Meraki one and unpublish it.
 Refresh maps.mapwize.io or relaunch your app to see the difference.
 
 If you want to build an interactive map, follow the Mapwize tutorials to app places and directions.
-
-### Advanced: build the full Mapwize app
-
-If you want to go further with mobile development, you can build the open-source Mapwize mobile app adding the socketIndoorLocationProvider in it.
-
-The source code of the Mapwize app is available for
-
-* [iOS](https://github.com/Mapwize/mapwize-app-ios)
-* [Android](https://github.com/Mapwize/mapwize-app-android)
 
 ## 3 - Track assets
 
@@ -253,6 +207,7 @@ git clone https://github.com/IndoorLocation/indoor-location-alerter
 
 And start it using the following parameters
 
+- `INDOOR_LOCATION_SOCKET_URL`: 'http://localhost:3004'
 - `USER_ID`: The IP or Mac you want to track
 - `MAPWIZE_API_KEY`: Your Mapwize API KEY
 - `MAPWIZE_PLACE_ID`: Mapwize Place ID that represents the area
